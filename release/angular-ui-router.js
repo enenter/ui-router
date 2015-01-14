@@ -3215,7 +3215,7 @@ function $StateProvider(   $urlRouterProvider,   $urlMatcherFactory) {
          * @param {State} fromState The current state, pre-transition.
          * @param {Object} fromParams The params supplied to the `fromState`.
          */
-          $rootScope.$broadcast('$stateChangeSuccess', to.self, toParams, from.self, fromParams);
+        $rootScope.$broadcast('$stateChangeSuccess', to.self, toParams, from.self, fromParams, options);
         }
         $urlRouter.update(true);
 
@@ -3455,7 +3455,7 @@ function $StateProvider(   $urlRouterProvider,   $urlMatcherFactory) {
       forEach(state.views, function (view, name) {
         var injectables = (view.resolve && view.resolve !== state.resolve ? view.resolve : {});
         injectables.$template = [ function () {
-          return $view.load(name, { view: view, locals: locals, params: $stateParams, notify: options.notify }) || '';
+          return $view.load(name, { view: view, locals: locals, params: $stateParams, notify: options.notify, persist: options.persist }) || '';
         }];
 
         promises.push($resolve.resolve(injectables, locals, dst.resolve, state).then(function (result) {
@@ -3827,7 +3827,7 @@ function $ViewDirective(   $state,   $injector,   $uiViewScroll,   $interpolate)
           }
         }
 
-        function updateView(firstTime) {
+        function updateView(firstTime, options) {
           var newScope,
               name            = getUiViewName(scope, attrs, $element, $interpolate),
               previousLocals  = name && $state.$current && $state.$current.locals[name];
@@ -3836,21 +3836,40 @@ function $ViewDirective(   $state,   $injector,   $uiViewScroll,   $interpolate)
           newScope = scope.$new();
           latestLocals = $state.$current.locals[name];
 
-          var clone = $transclude(newScope, function(clone) {
-            renderer.enter(clone, $element, function onUiViewEnter() {
-              if(currentScope) {
-                currentScope.$emit('$viewContentAnimationEnded');
+          if (options && options.persist)
+          {
+            for (var key in latestLocals) {
+              if (latestLocals.hasOwnProperty(key) && key.charAt(0) != '$') {
+                if (currentScope.hasOwnProperty(key))
+                {
+                  currentScope[key] = latestLocals[key];
+                  delete(latestLocals[key]);
+                }
               }
+            }
+          }
+          else
+          {
+            var clone = $transclude(newScope, function(clone) {
 
-              if (angular.isDefined(autoScrollExp) && !autoScrollExp || scope.$eval(autoScrollExp)) {
-                $uiViewScroll(clone);
-              }
+              renderer.enter(clone, $element, function onUiViewEnter() {
+
+                if(currentScope) {
+                  currentScope.$emit('$viewContentAnimationEnded');
+                }
+
+                if (angular.isDefined(autoScrollExp) && !autoScrollExp || scope.$eval(autoScrollExp)) {
+                  $uiViewScroll(clone);
+                }
+              });
+
+              cleanupLastView();
+
+              currentScope = newScope;
+              currentEl = clone;
             });
-            cleanupLastView();
-          });
+          }
 
-          currentEl = clone;
-          currentScope = newScope;
           /**
            * @ngdoc event
            * @name ui.router.state.directive:ui-view#$viewContentLoaded

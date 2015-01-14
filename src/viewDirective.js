@@ -177,11 +177,11 @@ function $ViewDirective(   $state,   $injector,   $uiViewScroll,   $interpolate)
             autoScrollExp = attrs.autoscroll,
             renderer      = getRenderer(attrs, scope);
 
-        scope.$on('$stateChangeSuccess', function() {
-          updateView(false);
+        scope.$on('$stateChangeSuccess', function(event, toSelf, toParams, fromSelf, fromParams, options) {
+          updateView(false, options);
         });
-        scope.$on('$viewContentLoading', function() {
-          updateView(false);
+        scope.$on('$viewContentLoading', function(event, options) {
+          updateView(false, options);
         });
 
         updateView(true);
@@ -207,7 +207,7 @@ function $ViewDirective(   $state,   $injector,   $uiViewScroll,   $interpolate)
           }
         }
 
-        function updateView(firstTime) {
+        function updateView(firstTime, options) {
           var newScope,
               name            = getUiViewName(scope, attrs, $element, $interpolate),
               previousLocals  = name && $state.$current && $state.$current.locals[name];
@@ -216,21 +216,40 @@ function $ViewDirective(   $state,   $injector,   $uiViewScroll,   $interpolate)
           newScope = scope.$new();
           latestLocals = $state.$current.locals[name];
 
-          var clone = $transclude(newScope, function(clone) {
-            renderer.enter(clone, $element, function onUiViewEnter() {
-              if(currentScope) {
-                currentScope.$emit('$viewContentAnimationEnded');
+          if (options && options.persist)
+          {
+            for (var key in latestLocals) {
+              if (latestLocals.hasOwnProperty(key) && key.charAt(0) != '$') {
+                if (currentScope.hasOwnProperty(key))
+                {
+                  currentScope[key] = latestLocals[key];
+                  delete(latestLocals[key]);
+                }
               }
+            }
+          }
+          else
+          {
+            var clone = $transclude(newScope, function(clone) {
 
-              if (angular.isDefined(autoScrollExp) && !autoScrollExp || scope.$eval(autoScrollExp)) {
-                $uiViewScroll(clone);
-              }
+              renderer.enter(clone, $element, function onUiViewEnter() {
+
+                if(currentScope) {
+                  currentScope.$emit('$viewContentAnimationEnded');
+                }
+
+                if (angular.isDefined(autoScrollExp) && !autoScrollExp || scope.$eval(autoScrollExp)) {
+                  $uiViewScroll(clone);
+                }
+              });
+
+              cleanupLastView();
+
+              currentScope = newScope;
+              currentEl = clone;
             });
-            cleanupLastView();
-          });
+          }
 
-          currentEl = clone;
-          currentScope = newScope;
           /**
            * @ngdoc event
            * @name ui.router.state.directive:ui-view#$viewContentLoaded
