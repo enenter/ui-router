@@ -3455,7 +3455,7 @@ function $StateProvider(   $urlRouterProvider,   $urlMatcherFactory) {
       forEach(state.views, function (view, name) {
         var injectables = (view.resolve && view.resolve !== state.resolve ? view.resolve : {});
         injectables.$template = [ function () {
-          return $view.load(name, { view: view, locals: locals, params: $stateParams, notify: options.notify, persist: options.persist }) || '';
+          return $view.load(name, { view: view, locals: locals, params: $stateParams, notify: options.notify }) || '';
         }];
 
         promises.push($resolve.resolve(injectables, locals, dst.resolve, state).then(function (result) {
@@ -3795,13 +3795,14 @@ function $ViewDirective(   $state,   $injector,   $uiViewScroll,   $interpolate)
         var previousEl, currentEl, currentScope, latestLocals,
             onloadExp     = attrs.onload || '',
             autoScrollExp = attrs.autoscroll,
+            persist       = attrs.persist,
             renderer      = getRenderer(attrs, scope);
 
-        scope.$on('$stateChangeSuccess', function() {
-          updateView(false);
+        scope.$on('$stateChangeSuccess', function(event, toSelf, toParams, fromSelf, fromParams, options) {
+          updateView(false, persist, toSelf, toParams, fromSelf, fromParams, options);
         });
         scope.$on('$viewContentLoading', function() {
-          updateView(false);
+          updateView(false, persist);
         });
 
         updateView(true);
@@ -3827,7 +3828,8 @@ function $ViewDirective(   $state,   $injector,   $uiViewScroll,   $interpolate)
           }
         }
 
-        function updateView(firstTime, options) {
+        function updateView(firstTime, persist, toSelf, toParams, fromSelf, fromParams, options) {
+
           var newScope,
               name            = getUiViewName(scope, attrs, $element, $interpolate),
               previousLocals  = name && $state.$current && $state.$current.locals[name];
@@ -3836,19 +3838,7 @@ function $ViewDirective(   $state,   $injector,   $uiViewScroll,   $interpolate)
           newScope = scope.$new();
           latestLocals = $state.$current.locals[name];
 
-          if (options && options.persist)
-          {
-            for (var key in latestLocals) {
-              if (latestLocals.hasOwnProperty(key) && key.charAt(0) != '$') {
-                if (currentScope.hasOwnProperty(key))
-                {
-                  currentScope[key] = latestLocals[key];
-                  delete(latestLocals[key]);
-                }
-              }
-            }
-          }
-          else
+          if (!persist || (toSelf.name == fromSelf.name))
           {
             var clone = $transclude(newScope, function(clone) {
 
