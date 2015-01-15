@@ -3838,7 +3838,7 @@ function $ViewDirective(   $state,   $injector,   $uiViewScroll,   $interpolate)
           newScope = scope.$new();
           latestLocals = $state.$current.locals[name];
 
-          if (!persist || (toSelf.name == fromSelf.name))
+          if (!persist || (toSelf.name != fromSelf.name))
           {
             var clone = $transclude(newScope, function(clone) {
 
